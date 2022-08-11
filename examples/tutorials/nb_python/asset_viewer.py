@@ -201,7 +201,8 @@ def make_default_settings():
     settings = {
         "width": 1280,  # Spatial resolution of the observations
         "height": 720,
-        "scene": "./data/scene_datasets/mp3d_example/17DRP5sb8fy/17DRP5sb8fy.glb",  # Scene path
+        #"scene": "./data/scene_datasets/mp3d_example/17DRP5sb8fy/17DRP5sb8fy.glb",  # Scene path
+        "scene": "/home/zhwang/workspace/opensource/habitat/data/scene_datasets/hm3d/minival/00800-TEEsavR23oF/TEEsavR23oF.glb",  # Scene path
         "default_agent": 0,
         "sensor_height": 1.5,  # Height of sensors in meters
         "sensor_pitch": -math.pi / 8.0,  # sensor pitch (x rotation in rads)
@@ -231,7 +232,8 @@ def make_simulator_from_settings(sim_settings):
     sim = habitat_sim.Simulator(cfg)
     # Managers of various Attributes templates
     obj_attr_mgr = sim.get_object_template_manager()
-    obj_attr_mgr.load_configs(str(os.path.join(data_path, "objects/example_objects")))
+    #obj_attr_mgr.load_configs(str(os.path.join(data_path, "objects/example_objects")))
+    obj_attr_mgr.load_configs(str(os.path.join(data_path, "test_assets/objects")))
     prim_attr_mgr = sim.get_asset_template_manager()
     stage_attr_mgr = sim.get_stage_template_manager()
     # Manager providing access to rigid objects

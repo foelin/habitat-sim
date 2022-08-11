@@ -48,7 +48,8 @@ def main(display=True):
 
     backend_cfg = habitat_sim.SimulatorConfiguration()
     backend_cfg.scene_id = (
-        "data/scene_datasets/habitat-test-scenes/skokloster-castle.glb"
+        #"data/scene_datasets/habitat-test-scenes/skokloster-castle.glb"
+        "/home/zhwang/workspace/opensource/habitat/data/scene_datasets/hm3d/minival/00800-TEEsavR23oF/TEEsavR23oF.glb"
     )
 
     # First, let's create a stereo RGB agent
