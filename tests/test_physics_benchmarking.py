@@ -8,7 +8,7 @@ import pytest
 
 import examples.settings
 import habitat_sim
-import utils
+import helpers.utils as utils
 
 
 @pytest.mark.skipif(not habitat_sim.vhacd_enabled, reason="Test requires vhacd")

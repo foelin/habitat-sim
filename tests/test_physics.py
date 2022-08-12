@@ -22,7 +22,7 @@ from habitat_sim.utils.common import (
     quat_to_magnum,
     random_quaternion,
 )
-from utils import simulate
+from helpers.utils import simulate
 
 
 @pytest.mark.skipif(
