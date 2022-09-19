@@ -1,50 +1,3 @@
-# ---
-# jupyter:
-#   accelerator: GPU
-#   colab:
-#     collapsed_sections: []
-#     name: 'ECCV 2020: Habitat-sim Interactivity'
-#     provenance: []
-#   jupytext:
-#     cell_metadata_filter: -all
-#     formats: nb_python//py:percent,colabs//ipynb
-#     notebook_metadata_filter: all
-#     text_representation:
-#       extension: .py
-#       format_name: percent
-#       format_version: '1.3'
-#       jupytext_version: 1.13.7
-#   kernelspec:
-#     display_name: Python 3
-#     name: python3
-# ---
-
-# %% [markdown]
-# <a href="https://colab.research.google.com/github/facebookresearch/habitat-sim/blob/main/examples/tutorials/colabs/ECCV_2020_Interactivity.ipynb" target="_parent"><img src="https://colab.research.google.com/assets/colab-badge.svg" alt="Open In Colab"/></a>
-
-# %% [markdown]
-# #Habitat-sim Interactivity
-#
-# This use-case driven tutorial covers Habitat-sim interactivity, including:
-# - Adding new objects to a scene
-# - Kinematic object manipulation
-# - Physics simulation API
-# - Sampling valid object locations
-# - Generating a NavMesh including STATIC objects
-# - Agent embodiment and continuous control
-
-# %%
-# @title Installation { display-mode: "form" }
-# @markdown (double click to show code).
-
-# !curl -L https://raw.githubusercontent.com/facebookresearch/habitat-sim/main/examples/colab_utils/colab_install.sh | NIGHTLY=true bash -s
-
-# %%
-# @title Path Setup and Imports { display-mode: "form" }
-# @markdown (double click to show code).
-
-# %cd /content/habitat-sim
-## [setup]
 import math
 import os
 import random
@@ -54,7 +7,6 @@ import git
 import magnum as mn
 import numpy as np
 
-# %matplotlib inline
 from matplotlib import pyplot as plt
 from PIL import Image
 
@@ -62,23 +14,13 @@ import habitat_sim
 from habitat_sim.utils import common as ut
 from habitat_sim.utils import viz_utils as vut
 
-try:
-    import ipywidgets as widgets
-    from IPython.display import display as ipydisplay
-
-    # For using jupyter/ipywidget IO components
-
-    HAS_WIDGETS = True
-except ImportError:
-    HAS_WIDGETS = False
-
 
 if "google.colab" in sys.modules:
     os.environ["IMAGEIO_FFMPEG_EXE"] = "/usr/bin/ffmpeg"
 
 repo = git.Repo(".", search_parent_directories=True)
 dir_path = repo.working_tree_dir
-# %cd $dir_path
+
 data_path = os.path.join(dir_path, "data")
 output_directory = "examples/tutorials/interactivity_output/"  # @param {type:"string"}
 output_path = os.path.join(dir_path, output_directory)
@@ -99,15 +41,8 @@ if "sim" not in globals():
     rigid_obj_mgr = None
 
 
-# %%
-# @title Define Configuration Utility Functions { display-mode: "form" }
-# @markdown (double click to show code)
-
-# @markdown This cell defines a number of utility functions used throughout the tutorial to make simulator reconstruction easy:
-# @markdown - make_cfg
-# @markdown - make_default_settings
-# @markdown - make_simulator_from_settings
-
+#===========================================================
+# @title Define Configuration Utility Functions
 
 def make_cfg(settings):
     sim_cfg = habitat_sim.SimulatorConfiguration()
@@ -186,7 +121,7 @@ def make_cfg(settings):
         color_sensor_3rd_person_spec.position = [
             0.0,
             settings["sensor_height"] + 0.2,
-            0.2,
+            0.4,
         ]
         color_sensor_3rd_person_spec.orientation = [-math.pi / 4, 0, 0]
         color_sensor_3rd_person_spec.sensor_subtype = habitat_sim.SensorSubType.PINHOLE
@@ -207,8 +142,8 @@ def make_default_settings():
         "sensor_height": 1.5,  # Height of sensors in meters
         "sensor_pitch": -math.pi / 8.0,  # sensor pitch (x rotation in rads)
         "color_sensor_1st_person": True,  # RGB sensor
-        "color_sensor_3rd_person": False,  # RGB sensor 3rd person
-        "depth_sensor_1st_person": False,  # Depth sensor
+        "color_sensor_3rd_person": True,  # RGB sensor 3rd person
+        "depth_sensor_1st_person": True,  # Depth sensor
         "semantic_sensor_1st_person": False,  # Semantic sensor
         "seed": 1,
         "enable_physics": True,  # enable dynamics simulation
@@ -237,15 +172,8 @@ def make_simulator_from_settings(sim_settings):
     # Manager providing access to rigid objects
     rigid_obj_mgr = sim.get_rigid_object_manager()
 
-
-# %%
-# @title Define Simulation Utility Functions { display-mode: "form" }
-# @markdown (double click to show code)
-
-# @markdown - remove_all_objects
-# @markdown - simulate
-# @markdown - sample_object_state
-
+#===========================================================
+# Define Simulation Utility Functions { display-mode: "form" }
 
 def simulate(sim, dt=1.0, get_frames=True):
     # simulate dt seconds at 60Hz to the nearest fixed timestep
@@ -332,22 +260,24 @@ def sample_object_state(
         return False
     return True
 
+# ==============================================================
+# Define Visualization Utility Function { display-mode: "form" }
 
-# %%
-# @title Define Visualization Utility Function { display-mode: "form" }
-# @markdown (double click to show code)
-# @markdown - display_sample
-
-# Change to do something like this maybe: https://stackoverflow.com/a/41432704
 def display_sample(
-    rgb_obs, semantic_obs=np.array([]), depth_obs=np.array([]), key_points=None
+    rgb_1st_obs, rgb_3rd_obs=np.array([]), semantic_obs=np.array([]), depth_obs=np.array([]), key_points=None
 ):
     from habitat_sim.utils.common import d3_40_colors_rgb
 
-    rgb_img = Image.fromarray(rgb_obs, mode="RGBA")
+    rgb_1st_img = Image.fromarray(rgb_1st_obs, mode="RGBA")
 
-    arr = [rgb_img]
-    titles = ["rgb"]
+    arr = [rgb_1st_img]
+    titles = ["rgb_1st"]
+
+    if rgb_3rd_obs.size != 0:
+        rgb_3rd_img = Image.fromarray(rgb_3rd_obs, mode="RGBA")
+        arr.append(rgb_3rd_img)
+        titles.append("rgb_3rd")
+
     if semantic_obs.size != 0:
         semantic_img = Image.new("P", (semantic_obs.shape[1], semantic_obs.shape[0]))
         semantic_img.putpalette(d3_40_colors_rgb.flatten())
@@ -392,84 +322,6 @@ else:
     display = False
 
 
-# %%
-# @title Define Colab GUI Utility Functions { display-mode: "form" }
-# @markdown (double click to show code)
-
-# Event handler for dropdowns displaying file-based object handles
-def on_file_obj_ddl_change(ddl_values):
-    global sel_file_obj_handle
-    sel_file_obj_handle = ddl_values["new"]
-    return sel_file_obj_handle
-
-
-# Event handler for dropdowns displaying prim-based object handles
-def on_prim_obj_ddl_change(ddl_values):
-    global sel_prim_obj_handle
-    sel_prim_obj_handle = ddl_values["new"]
-    return sel_prim_obj_handle
-
-
-# Event handler for dropdowns displaying asset handles
-def on_prim_ddl_change(ddl_values):
-    global sel_asset_handle
-    sel_asset_handle = ddl_values["new"]
-    return sel_asset_handle
-
-
-# Build a dropdown list holding obj_handles and set its event handler
-def set_handle_ddl_widget(obj_handles, handle_types, sel_handle, on_change):
-    sel_handle = obj_handles[0]
-    descStr = handle_types + " Template Handles:"
-    style = {"description_width": "300px"}
-    obj_ddl = widgets.Dropdown(
-        options=obj_handles,
-        value=sel_handle,
-        description=descStr,
-        style=style,
-        disabled=False,
-        layout={"width": "max-content"},
-    )
-
-    obj_ddl.observe(on_change, names="value")
-    return obj_ddl, sel_handle
-
-
-def set_button_launcher(desc):
-    button = widgets.Button(
-        description=desc,
-        layout={"width": "max-content"},
-    )
-    return button
-
-
-def make_sim_and_vid_button(prefix, dt=1.0):
-    if not HAS_WIDGETS:
-        return
-
-    def on_sim_click(b):
-        observations = simulate(sim, dt=dt)
-        vut.make_video(
-            observations, "color_sensor_1st_person", "color", output_path + prefix
-        )
-
-    sim_and_vid_btn = set_button_launcher("Simulate and Make Video")
-    sim_and_vid_btn.on_click(on_sim_click)
-    ipydisplay(sim_and_vid_btn)
-
-
-def make_clear_all_objects_button():
-    if not HAS_WIDGETS:
-        return
-
-    def on_clear_click(b):
-        rigid_obj_mgr.remove_all_objects()
-
-    clear_objs_button = set_button_launcher("Clear all objects")
-    clear_objs_button.on_click(on_clear_click)
-    ipydisplay(clear_objs_button)
-
-
 # Builds widget-based UI components
 def build_widget_ui(obj_attr_mgr, prim_attr_mgr):
     # Holds the user's desired file-based object template handle
@@ -489,496 +341,26 @@ def build_widget_ui(obj_attr_mgr, prim_attr_mgr):
     file_obj_handles = obj_attr_mgr.get_file_template_handles()
     prim_obj_handles = obj_attr_mgr.get_synth_template_handles()
     prim_asset_handles = prim_attr_mgr.get_template_handles()
-    if not HAS_WIDGETS:
-        sel_file_obj_handle = file_obj_handles[0]
-        sel_prim_obj_handle = prim_obj_handles[0]
-        sel_asset_handle = prim_asset_handles[0]
-        return
-    file_obj_ddl, sel_file_obj_handle = set_handle_ddl_widget(
-        file_obj_handles,
-        "File-based Object",
-        sel_file_obj_handle,
-        on_file_obj_ddl_change,
-    )
-    # All primitive asset-based object template handles
-    prim_obj_ddl, sel_prim_obj_handle = set_handle_ddl_widget(
-        prim_obj_handles,
-        "Primitive-based Object",
-        sel_prim_obj_handle,
-        on_prim_obj_ddl_change,
-    )
-    # All primitive asset handles template handles
-    prim_asset_ddl, sel_asset_handle = set_handle_ddl_widget(
-        prim_asset_handles, "Primitive Asset", sel_asset_handle, on_prim_ddl_change
-    )
-    # Display DDLs
-    ipydisplay(file_obj_ddl)
-    ipydisplay(prim_obj_ddl)
-    ipydisplay(prim_asset_ddl)
+    
+    sel_file_obj_handle = file_obj_handles[0]
+    sel_prim_obj_handle = prim_obj_handles[0]
+    sel_asset_handle = prim_asset_handles[0]
+    
 
+# =========================================================================
+## Embodied Continuous Navigation
 
-# %%
-# @title Initialize Simulator and Load Scene { display-mode: "form" }
+#===========================================================================
+# Initialize Simulator and Load Scene { display-mode: "form" }
 
 # convienience functions defined in Utility cell manage global variables
 sim_settings = make_default_settings()
 # set globals: sim,
 make_simulator_from_settings(sim_settings)
 
-# %% [markdown]
-# #Interactivity in Habitat-sim
-#
-# This tutorial covers how to configure and use the Habitat-sim object manipulation API to setup and run physical interaction simulations.
-#
-# ## Outline:
-# This section is divided into four use-case driven sub-sections:
-# 1.   Introduction to Interactivity
-# 2.   Physical Reasoning
-# 3.   Generating Scene Clutter on the NavMesh
-# 4.   Continuous Embodied Navigation
-#
-# For more tutorial examples and details see the [Interactive Rigid Objects tutorial](https://aihabitat.org/docs/habitat-sim/rigid-object-tutorial.html) also available for Colab [here](https://github.com/facebookresearch/habitat-sim/blob/main/examples/tutorials/colabs/rigid_object_tutorial.ipynb).
-#
-#
-#
-#
-
-# %% [markdown]
-# ## Introduction to Interactivity
-#
-# ####Easily add an object and simulate!
-#
-#
-
-# %%
-# @title Select a Simulation Object Template: { display-mode: "form" }
-# @markdown Use the dropdown menu below to select an object template for use in the following examples.
-
-# @markdown File-based object templates are loaded from and named after an asset file (e.g. banana.glb), while Primitive-based object templates are generated programmatically (e.g. uv_sphere) with handles (name/key for reference) uniquely generated from a specific parameterization.
-
-# @markdown See the Advanced Features tutorial for more details about asset configuration.
 
 build_widget_ui(obj_attr_mgr, prim_attr_mgr)
 
-# %%
-# @title Add either a File-based or Primitive Asset-based object to the scene at a user-specified location.{ display-mode: "form" }
-# @markdown Running this will add a physically-modelled object of the selected type to the scene at the location specified by user, simulate forward for a few seconds and save a movie of the results.
-
-# @markdown Choose either the primitive or file-based template recently selected in the dropdown:
-obj_template_handle = sel_file_obj_handle
-asset_tempalte_handle = sel_asset_handle
-object_type = "File-based"  # @param ["File-based","Primitive-based"]
-if "File" in object_type:
-    # Handle File-based object handle
-    obj_template_handle = sel_file_obj_handle
-elif "Primitive" in object_type:
-    # Handle Primitive-based object handle
-    obj_template_handle = sel_prim_obj_handle
-else:
-    # Unknown - defaults to file-based
-    pass
-
-# @markdown Configure the initial object location (local offset from the agent body node):
-# default : offset=np.array([0,2.0,-1.5]), orientation=np.quaternion(1,0,0,0)
-offset_x = 0.5  # @param {type:"slider", min:-2, max:2, step:0.1}
-offset_y = 1.4  # @param {type:"slider", min:0, max:3.0, step:0.1}
-offset_z = -1.5  # @param {type:"slider", min:-3, max:0, step:0.1}
-offset = np.array([offset_x, offset_y, offset_z])
-
-# @markdown Configure the initial object orientation via local Euler angle (degrees):
-orientation_x = 0  # @param {type:"slider", min:-180, max:180, step:1}
-orientation_y = 0  # @param {type:"slider", min:-180, max:180, step:1}
-orientation_z = 0  # @param {type:"slider", min:-180, max:180, step:1}
-
-# compose the rotations
-rotation_x = mn.Quaternion.rotation(mn.Deg(orientation_x), mn.Vector3(1.0, 0, 0))
-rotation_y = mn.Quaternion.rotation(mn.Deg(orientation_y), mn.Vector3(1.0, 0, 0))
-rotation_z = mn.Quaternion.rotation(mn.Deg(orientation_z), mn.Vector3(1.0, 0, 0))
-orientation = rotation_z * rotation_y * rotation_x
-
-# Add object instantiated by desired template using template handle
-obj_1 = rigid_obj_mgr.add_object_by_template_handle(obj_template_handle)
-
-# @markdown Note: agent local coordinate system is Y up and -Z forward.
-# Move object to be in front of the agent
-set_object_state_from_agent(sim, obj_1, offset=offset, orientation=orientation)
-
-# display a still frame of the scene after the object is added if RGB sensor is enabled
-observations = sim.get_sensor_observations()
-if display and sim_settings["color_sensor_1st_person"]:
-    display_sample(observations["color_sensor_1st_person"])
-
-example_type = "adding objects test"
-make_sim_and_vid_button(example_type)
-make_clear_all_objects_button()
-
-
-# %% [markdown]
-#
-#
-#
-#
-# ## Physical Reasoning
-
-# %% [markdown]
-# This section demonstrates simple setups for physical reasoning tasks in Habitat-sim with a fixed camera position collecting data:
-# - Scripted vs. Dynamic Motion
-# - Object Permanence
-# - Physical plausibility classification
-# - Trajectory Prediction
-
-# %%
-# @title Select object templates from the GUI: { display-mode: "form" }
-
-build_widget_ui(obj_attr_mgr, prim_attr_mgr)
-
-# %%
-# @title Scripted vs. Dynamic Motion { display-mode: "form" }
-# @markdown A quick script to generate video data for AI classification of dynamically dropping vs. kinematically moving objects.
-rigid_obj_mgr.remove_all_objects()
-# @markdown Set the scene as dynamic or kinematic:
-scenario_is_kinematic = True  # @param {type:"boolean"}
-
-# add the selected object
-obj_1 = rigid_obj_mgr.add_object_by_template_handle(sel_file_obj_handle)
-
-# place the object
-set_object_state_from_agent(
-    sim, obj_1, offset=np.array([0, 2.0, -1.0]), orientation=ut.random_quaternion()
-)
-
-if scenario_is_kinematic:
-    # use the velocity control struct to setup a constant rate kinematic motion
-    obj_1.motion_type = habitat_sim.physics.MotionType.KINEMATIC
-    vel_control = obj_1.velocity_control
-    vel_control.controlling_lin_vel = True
-    vel_control.linear_velocity = np.array([0, -1.0, 0])
-
-# simulate and collect observations
-example_type = "kinematic vs dynamic"
-observations = simulate(sim, dt=2.0)
-if make_video:
-    vut.make_video(
-        observations,
-        "color_sensor_1st_person",
-        "color",
-        output_path + example_type,
-        open_vid=show_video,
-    )
-
-rigid_obj_mgr.remove_all_objects()
-
-
-# %%
-# @title Object Permanence { display-mode: "form" }
-# @markdown This example script demonstrates a possible object permanence task.
-# @markdown Two objects are dropped behind an occluder. One is removed while occluded.
-rigid_obj_mgr.remove_all_objects()
-
-# @markdown 1. Add the two dynamic objects.
-# add the selected objects
-obj_1 = rigid_obj_mgr.add_object_by_template_handle(sel_file_obj_handle)
-obj_2 = rigid_obj_mgr.add_object_by_template_handle(sel_file_obj_handle)
-
-# place the objects
-set_object_state_from_agent(
-    sim, obj_1, offset=np.array([0.5, 2.0, -1.0]), orientation=ut.random_quaternion()
-)
-set_object_state_from_agent(
-    sim,
-    obj_2,
-    offset=np.array([-0.5, 2.0, -1.0]),
-    orientation=ut.random_quaternion(),
-)
-
-# @markdown 2. Configure and add an occluder from a scaled cube primitive.
-# Get a default cube primitive template
-cube_handle = obj_attr_mgr.get_template_handles("cube")[0]
-cube_template_cpy = obj_attr_mgr.get_template_by_handle(cube_handle)
-# Modify the template's configured scale.
-cube_template_cpy.scale = np.array([0.32, 0.075, 0.01])
-# Register the modified template under a new name.
-obj_attr_mgr.register_template(cube_template_cpy, "occluder_cube")
-# Instance and place the occluder object from the template.
-occluder_obj = rigid_obj_mgr.add_object_by_template_handle("occluder_cube")
-set_object_state_from_agent(sim, occluder_obj, offset=np.array([0.0, 1.4, -0.4]))
-occluder_obj.motion_type = habitat_sim.physics.MotionType.KINEMATIC
-# fmt off
-# @markdown 3. Simulate at 60Hz, removing one object when it's center of mass drops below that of the occluder.
-# fmt on
-# Simulate and remove object when it passes the midpoint of the occluder
-dt = 2.0
-print("Simulating " + str(dt) + " world seconds.")
-observations = []
-# simulate at 60Hz to the nearest fixed timestep
-start_time = sim.get_world_time()
-
-while sim.get_world_time() < start_time + dt:
-    sim.step_physics(1.0 / 60.0)
-    # remove the object once it passes the occluder center and it still exists/hasn't already been removed
-    if obj_2.is_alive and obj_2.translation[1] <= occluder_obj.translation[1]:
-        rigid_obj_mgr.remove_object_by_id(obj_2.object_id)
-    observations.append(sim.get_sensor_observations())
-
-example_type = "object permanence"
-if make_video:
-    vut.make_video(
-        observations,
-        "color_sensor_1st_person",
-        "color",
-        output_path + example_type,
-        open_vid=show_video,
-    )
-rigid_obj_mgr.remove_all_objects()
-
-
-# %%
-# @title Physical Plausibility Classification { display-mode: "form" }
-# @markdown This example demonstrates a physical plausibility expirement. A sphere
-# @markdown is dropped onto the back of a couch to roll onto the floor. Optionally,
-# @markdown an invisible plane is introduced for the sphere to roll onto producing
-# @markdown non-physical motion.
-
-introduce_surface = True  # @param{type:"boolean"}
-
-rigid_obj_mgr.remove_all_objects()
-
-# add a rolling object
-obj_attr_mgr = sim.get_object_template_manager()
-sphere_handle = obj_attr_mgr.get_template_handles("uvSphereSolid")[0]
-obj_1 = rigid_obj_mgr.add_object_by_template_handle(sphere_handle)
-set_object_state_from_agent(sim, obj_1, offset=np.array([1.0, 1.6, -1.95]))
-
-if introduce_surface:
-    # optionally add invisible surface
-    cube_handle = obj_attr_mgr.get_template_handles("cube")[0]
-    cube_template_cpy = obj_attr_mgr.get_template_by_handle(cube_handle)
-    # Modify the template.
-    cube_template_cpy.scale = np.array([1.0, 0.04, 1.0])
-    surface_is_visible = False  # @param{type:"boolean"}
-    cube_template_cpy.is_visibile = surface_is_visible
-    # Register the modified template under a new name.
-    obj_attr_mgr.register_template(cube_template_cpy, "invisible_surface")
-
-    # Instance and place the surface object from the template.
-    surface_obj = rigid_obj_mgr.add_object_by_template_handle("invisible_surface")
-    set_object_state_from_agent(sim, surface_obj, offset=np.array([0.4, 0.88, -1.6]))
-    surface_obj.motion_type = habitat_sim.physics.MotionType.STATIC
-
-
-example_type = "physical plausibility"
-observations = simulate(sim, dt=3.0)
-if make_video:
-    vut.make_video(
-        observations,
-        "color_sensor_1st_person",
-        "color",
-        output_path + example_type,
-        open_vid=show_video,
-    )
-rigid_obj_mgr.remove_all_objects()
-
-
-# %%
-# @title Trajectory Prediction { display-mode: "form" }
-# @markdown This example demonstrates setup of a trajectory prediction task.
-# @markdown Boxes are placed in a target zone and a sphere is given an initial
-# @markdown velocity with the goal of knocking the boxes off the counter.
-
-# @markdown ---
-# @markdown Configure Parameters:
-
-rigid_obj_mgr.remove_all_objects()
-
-seed = 2  # @param{type:"integer"}
-random.seed(seed)
-sim.seed(seed)
-np.random.seed(seed)
-
-# setup agent state manually to face the bar
-agent_state = sim.agents[0].state
-agent_state.position = np.array([-1.97496, 0.072447, -2.0894])
-agent_state.rotation = ut.quat_from_coeffs([0, -1, 0, 0])
-sim.agents[0].set_state(agent_state)
-
-# load the target objects
-cheezit_handle = obj_attr_mgr.get_template_handles("cheezit")[0]
-# create range from center and half-extent
-target_zone = mn.Range3D.from_center(
-    mn.Vector3(-2.07496, 1.07245, -0.2894), mn.Vector3(0.5, 0.05, 0.1)
-)
-num_targets = 9  # @param{type:"integer"}
-for _target in range(num_targets):
-    obj = rigid_obj_mgr.add_object_by_template_handle(cheezit_handle)
-    # rotate boxes off of their sides
-    obj.rotation = mn.Quaternion.rotation(
-        mn.Rad(-mn.math.pi_half), mn.Vector3(1.0, 0, 0)
-    )
-    # sample state from the target zone
-    if not sample_object_state(sim, obj, False, True, 100, target_zone):
-        rigid_obj_mgr.remove_object_by_id(obj.object_id)
-
-
-show_target_zone = False  # @param{type:"boolean"}
-if show_target_zone:
-    # Get and modify the wire cube template from the range
-    cube_handle = obj_attr_mgr.get_template_handles("cubeWireframe")[0]
-    cube_template_cpy = obj_attr_mgr.get_template_by_handle(cube_handle)
-    cube_template_cpy.scale = target_zone.size()
-    cube_template_cpy.is_collidable = False
-    # Register the modified template under a new name.
-    obj_attr_mgr.register_template(cube_template_cpy, "target_zone")
-    # instance and place the object from the template
-    target_zone_obj = rigid_obj_mgr.add_object_by_template_handle("target_zone")
-    target_zone_obj.translation = target_zone.center()
-    target_zone_obj.motion_type = habitat_sim.physics.MotionType.STATIC
-    # print("target_zone_center = " + str(target_zone_obj.translation))
-
-# @markdown ---
-# @markdown ###Ball properties:
-# load the ball
-sphere_handle = obj_attr_mgr.get_template_handles("uvSphereSolid")[0]
-sphere_template_cpy = obj_attr_mgr.get_template_by_handle(sphere_handle)
-# @markdown Mass:
-ball_mass = 5.01  # @param {type:"slider", min:0.01, max:50.0, step:0.01}
-sphere_template_cpy.mass = ball_mass
-obj_attr_mgr.register_template(sphere_template_cpy, "ball")
-
-ball_obj = rigid_obj_mgr.add_object_by_template_handle("ball")
-set_object_state_from_agent(sim, ball_obj, offset=np.array([0, 1.4, 0]))
-
-# @markdown Initial linear velocity (m/sec):
-lin_vel_x = 0  # @param {type:"slider", min:-10, max:10, step:0.1}
-lin_vel_y = 1  # @param {type:"slider", min:-10, max:10, step:0.1}
-lin_vel_z = 5  # @param {type:"slider", min:0, max:10, step:0.1}
-ball_obj.linear_velocity = mn.Vector3(lin_vel_x, lin_vel_y, lin_vel_z)
-
-# @markdown Initial angular velocity (rad/sec):
-ang_vel_x = 0  # @param {type:"slider", min:-100, max:100, step:0.1}
-ang_vel_y = 0  # @param {type:"slider", min:-100, max:100, step:0.1}
-ang_vel_z = 0  # @param {type:"slider", min:-100, max:100, step:0.1}
-ball_obj.angular_velocity = mn.Vector3(ang_vel_x, ang_vel_y, ang_vel_z)
-
-example_type = "trajectory prediction"
-observations = simulate(sim, dt=3.0)
-if make_video:
-    vut.make_video(
-        observations,
-        "color_sensor_1st_person",
-        "color",
-        output_path + example_type,
-        open_vid=show_video,
-    )
-rigid_obj_mgr.remove_all_objects()
-
-# %% [markdown]
-# ## Generating Scene Clutter on the NavMesh
-#
-# The NavMesh can be used to place objects on surfaces in the scene. Once objects are placed they can be set to MotionType::STATIC, indiciating that they are not moveable (kinematics and dynamics are disabled for STATIC objects). The NavMesh can then be recomputed including STATIC object meshes in the voxelization.
-#
-# This example demonstrates using the NavMesh to generate a cluttered scene for navigation. In this script we will:
-#
-# - Place objects off the NavMesh
-# - Set them to MotionType::STATIC
-# - Recompute the NavMesh including STATIC objects
-# - Visualize the results
-
-# %%
-# @title Initialize Simulator and Load Scene { display-mode: "form" }
-# @markdown (load the apartment_1 scene for clutter generation in an open space)
-sim_settings = make_default_settings()
-sim_settings["scene"] = "./data/scene_datasets/habitat-test-scenes/apartment_1.glb"
-sim_settings["sensor_pitch"] = 0
-
-make_simulator_from_settings(sim_settings)
-
-# %%
-# @title Select clutter object from the GUI: { display-mode: "form" }
-
-build_widget_ui(obj_attr_mgr, prim_attr_mgr)
-
-# %%
-# @title Clutter Generation Script
-# @markdown Configure some example parameters:
-
-seed = 2  # @param {type:"integer"}
-random.seed(seed)
-sim.seed(seed)
-np.random.seed(seed)
-
-# position the agent
-sim.agents[0].scene_node.translation = mn.Vector3(0.5, -1.60025, 6.15)
-print(sim.agents[0].scene_node.rotation)
-agent_orientation_y = -23  # @param{type:"integer"}
-sim.agents[0].scene_node.rotation = mn.Quaternion.rotation(
-    mn.Deg(agent_orientation_y), mn.Vector3(0, 1.0, 0)
-)
-
-num_objects = 10  # @param {type:"slider", min:0, max:20, step:1}
-object_scale = 5  # @param {type:"slider", min:1.0, max:10.0, step:0.1}
-
-# scale up the selected object
-sel_obj_template_cpy = obj_attr_mgr.get_template_by_handle(sel_file_obj_handle)
-sel_obj_template_cpy.scale = mn.Vector3(object_scale)
-obj_attr_mgr.register_template(sel_obj_template_cpy, "scaled_sel_obj")
-
-# add the selected object
-sim.navmesh_visualization = True
-rigid_obj_mgr.remove_all_objects()
-fails = 0
-for _obj in range(num_objects):
-    obj_1 = rigid_obj_mgr.add_object_by_template_handle("scaled_sel_obj")
-
-    # place the object
-    placement_success = sample_object_state(
-        sim, obj_1, from_navmesh=True, maintain_object_up=True, max_tries=100
-    )
-    if not placement_success:
-        fails += 1
-        rigid_obj_mgr.remove_object_by_id(obj_1.object_id)
-    else:
-        # set the objects to STATIC so they can be added to the NavMesh
-        obj_1.motion_type = habitat_sim.physics.MotionType.STATIC
-
-print("Placement fails = " + str(fails) + "/" + str(num_objects))
-
-# recompute the NavMesh with STATIC objects
-navmesh_settings = habitat_sim.NavMeshSettings()
-navmesh_settings.set_defaults()
-navmesh_success = sim.recompute_navmesh(
-    sim.pathfinder, navmesh_settings, include_static_objects=True
-)
-
-# simulate and collect observations
-example_type = "clutter generation"
-observations = simulate(sim, dt=2.0)
-if make_video:
-    vut.make_video(
-        observations,
-        "color_sensor_1st_person",
-        "color",
-        output_path + example_type,
-        open_vid=show_video,
-    )
-obj_attr_mgr.remove_template_by_handle("scaled_sel_obj")
-rigid_obj_mgr.remove_all_objects()
-sim.navmesh_visualization = False
-
-# %% [markdown]
-# ## Embodied Continuous Navigation
-
-# %% [markdown]
-# The following example demonstrates setup and excecution of an embodied navigation and interaction scenario. An object and an agent embodied by a rigid locobot mesh are placed randomly on the NavMesh. A path is computed for the agent to reach the object which is executed by a continuous path-following controller. The object is then kinematically gripped by the agent and a second path is computed for the agent to reach a goal location, also executed by a continuous controller. The gripped object is then released and thrown in front of the agent.
-#
-# Note: for a more detailed explanation of the NavMesh see Habitat-sim Basics tutorial.
-
-# %%
-# @title Select target object from the GUI: { display-mode: "form" }
-
-build_widget_ui(obj_attr_mgr, prim_attr_mgr)
-
-
-# %%
 # @title Continuous Path Follower Example { display-mode: "form" }
 # @markdown A python Class to provide waypoints along a path given agent states
 
@@ -1171,8 +553,7 @@ class ObjectGripper:
         self._gripped_obj = None
 
 
-# %%
-# @title Embodied Continuous Navigation Example { display-mode: "form" }
+    # @title Embodied Continuous Navigation Example { display-mode: "form" }
 # @markdown This example cell runs the object retrieval task.
 
 # @markdown First the Simulator is re-initialized with:
