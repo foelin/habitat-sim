@@ -578,7 +578,7 @@ def test_spherical_joints(make_video=True, show_video=True):
         )
 
         # query any damping motors created by default
-        existing_joint_motors = robot.get_existing_joint_motor_ids()
+        existing_joint_motors = robot.existing_joint_motor_ids
         print("default damping motors (motor_id -> dof): " + str(existing_joint_motors))
 
         # update the of the damping motors to hold pose
@@ -731,7 +731,7 @@ def main(make_video=True, show_video=True):
         place_robot_from_agent(sim, robot, -math.pi)
 
         # query any damping motors created by default
-        existing_joint_motors = robot.get_existing_joint_motor_ids()
+        existing_joint_motors = robot.existing_joint_motor_ids
         print("default damping motors (motor_id -> dof): " + str(existing_joint_motors))
 
         # get the max_impulse of the damping motors
@@ -753,7 +753,7 @@ def main(make_video=True, show_video=True):
         new_motor_id = robot.create_joint_motor(
             1, joint_motor_settings  # dof  # settings
         )
-        existing_joint_motors = robot.get_existing_joint_motor_ids()
+        existing_joint_motors = robot.existing_joint_motor_ids
         print("new_motor_id: " + str(new_motor_id))
         print(
             "existing motors after create (motor_id -> dof): "
@@ -785,14 +785,14 @@ def main(make_video=True, show_video=True):
         observations += simulate(sim, dt=1.5, get_frames=make_video)
 
         # remove all motors
-        existing_joint_motors = robot.get_existing_joint_motor_ids()
+        existing_joint_motors = robot.existing_joint_motor_ids
         print(
             "All motors (motor_id -> dof) before removal: " + str(existing_joint_motors)
         )
         for motor_id in existing_joint_motors:
             robot.remove_joint_motor(motor_id)
         print(
-            f"All motors (motor_id -> dof) after removal: {robot.get_existing_joint_motor_ids()}"
+            f"All motors (motor_id -> dof) after removal: {robot.existing_joint_motor_ids}"
         )
 
         # simulate
